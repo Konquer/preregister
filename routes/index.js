@@ -36,11 +36,20 @@ router.post('/prereg', (req, res) => {
   for(let i = 0; i < entries.length; i++) {
     
     let entry = entries[i];
-    console.log("username: " + entry.username + " -- email:" + entry.email);
+
+    // Check if username is taken
+    if(entry.username.toLowerCase() == req.body.username.toLowerCase()) {
+      return res.status(400).json({"error": "Username already taken"});
+    }
+
+    // Check if email is taken
+    if(entry.email.toLowerCase() == req.body.email.toLowerCase()) {
+      return res.status(400).json({"error": "Email has already been used to preregister a username"});
+    }
 
   }
 
-  return res.json(entries);
+  return res.send("went through");
   
 });
 
