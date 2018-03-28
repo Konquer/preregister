@@ -21,17 +21,17 @@ router.post('/prereg', (req, res) => {
 
   // Check if username and email was sent
   if(!req.body.username || !req.body.email) {
-    return res.status(400).json({"error": "Username and email must be set"});
+    return res.status(400).json({"error": config.outputs.errors.missing_input});
   }
 
   // Check if the email is valid
   if(!validator.isEmail(req.body.email)) {
-    return res.status(400).json({"error": "Email is not in a valid format"});
+    return res.status(400).json({"error": config.outputs.errors.email_invalid});
   }
 
   // Check if the username is valid
   if(!req.body.username.match(/^\w+-?\w+(?!-)$/) || req.body.username.length < 3 || req.body.username > 15){
-    return res.status(400).json({"error": "Username contains illegal characters, is formatted in an illegal way or is too short/long"});
+    return res.status(400).json({"error": config.outputs.errors.username_invalid});
   }
 
   let entries = db.get("preregistrations").value();
@@ -46,19 +46,19 @@ router.post('/prereg', (req, res) => {
 
       // Check if username is taken
       if(entry.username.toLowerCase() == req.body.username.toLowerCase()) {
-        return res.status(400).json({"error": "Username already taken"});
+        return res.status(400).json({"error": config.outputs.errors.username_taken});
       }
 
       // Check if email is taken
       if(entry.email.toLowerCase() == req.body.email.toLowerCase()) {
-        return res.status(400).json({"error": "Email has already been used to preregister a username"});
+        return res.status(400).json({"error": config.outputs.errors.email_already_used});
       }
 
     } else {
 
       // If this email has already tried preregistering this username
       if(entry.username.toLowerCase() == req.body.username.toLowerCase() && entry.email.toLowerCase() == req.body.email.toLowerCase()) {
-        return res.status(400).json({"error": "You have already requested to preregister this username. Please check your email for a verification link."});
+        return res.status(400).json({"error": config.outputs.errors.already_asked_for_username});
       }
 
     } 
@@ -80,17 +80,18 @@ router.post('/prereg', (req, res) => {
 
   // Send email
   let maildata = {
-    from: 'Test sender <preregister@noreply.ubbo.no>',
-    to: 'slungaards@gmail.com',
-    subject: 'Hello3',
-    text: 'Bob :) <b>test</b>'
+    from: config.mail_templates.verification_sent.from,
+    to: req.body.email,
+    subject: config.mail_templates.verification_sent.subject.replace("#{username}", req.body.username).replace("#{email}", req.body.email).replace("#{link}", rndstr),
+    text: config.mail_templates.verification_sent.html_disabled_text,
+    html: config.mail_templates.verification_sent.body.replace("#{username}", req.body.username).replace("#{email}", req.body.email).replace("#{link}", rndstr)
   };
 
   mailgun.messages().send(maildata, function (error, body) {
     if(error) {
-      res.status(400).json({"error": "Failed to send email"});
+      res.status(400).json({"error": config.outputs.errors.mailgun_error});
     } else {
-      res.status(200).json({"success": "You successfully preregistered! An email has been sent to " + req.body.email + " with further instructions."});
+      res.status(200).json({"success": config.outputs.success.preregistered.replace("#{email", req.body.email)});
     }
   });
   
@@ -100,6 +101,7 @@ router.get('/activate/:link', (req, res, next) => {
 
   const adapter = new FileSync('db.json');
   const db = low(adapter);
+  let found = false;
 
   db.defaults({ preregistrations: [] })
   .write();
@@ -113,22 +115,38 @@ router.get('/activate/:link', (req, res, next) => {
 
     // If the link exists
     if(entry.link == req.params.link) {
+      found = true;
       
       if(entry.verified) {
-        return res.status(400).json({"error": "This activation link has already been verified"});
+        return res.status(400).json({"error": config.outputs.errors.already_verified});
       }
 
       entry.verified = true;
       db.write();
 
-      // TODO: Send new email
+      // Send email
+      let maildata = {
+        from: config.mail_templates.preregister_activated.from,
+        to: entry.email,
+        subject: config.mail_templates.preregister_activated.subject.replace("#{username}", entry.username).replace("#{email}", entry.email).replace("#{link}", entry.link).replace("#{token}", entry.token),
+        text: config.mail_templates.preregister_activated.html_disabled_text,
+        html: config.mail_templates.preregister_activated.body.replace("#{username}", entry.username).replace("#{email}", entry.email).replace("#{link}", entry.link).replace("#{token}", entry.token)
+      };
 
-      return res.status(200).json({"success": "You successfully locked the username " + entry.username});
+      mailgun.messages().send(maildata, function (error, body) {
+        if(error) {
+          res.status(400).json({"error": config.outputs.errors.mailgun_error});
+        } else {
+          res.status(200).json({"success": config.outputs.success.verified.replace("#{username}", entry.username)});
+        }
+      });
+
     }
 
   }
 
-  return res.status(400).json({"error": "Activation link not found"});
+  if(!found)
+    return res.json({"error": config.outputs.errors.link_not_found});
 
 });
 
