@@ -21,6 +21,7 @@
           background: #FFF;
           border-radius: 2px;
           box-shadow: 0px 0px 0px 8px rgba(0,0,0,0.1);
+          text-align: center;
         }
         .head-section{
           background: #F3F3F3;
@@ -114,6 +115,9 @@
           opacity: 1;
           display: none;
         }
+        .token {
+          color: #555;
+        }
       </style>
   </head>
   <body>
@@ -122,63 +126,18 @@
         <img class="loader" src="../images/loading.gif">
         <div class="content-section">
           <div class="head-section">
-            <h3>Preregister</h3>
+            <h3>Congratulations!</h3>
           </div>
+          <br />
           <div class="body-section">
-            <p class="info"><small>After submitting a valid username and email you will be sent a verfication mail. Your chosen username will not be locked to you before the email has been verified.</small></p>
-            <form action="./prereg" method="post">
-              <div class="form-input">
-                <input id="username" type="text" name="username" placeholder="Username">
-              </div>
-              <div class="form-input">
-                <input id="email" type="email" name="email" placeholder="Email">
-              </div>
-
-              <div class="form-input message error">
-                error
-              </div>
-
-              <div class="form-input message success">
-                success
-              </div>
-
-              <div class="form-input">
-                <button type="submit" class="btn-submit">Preregister</button>
-              </div>
-            </form>
+            <p class="info"><small>The username <b><%= username %></b> is now locked to you.</small></p>
+            <p class="info">
+              <small>The code below can be used to retrieve your username once we open up the site. We have emailed it to you aswell.</small>
+            </p>
+            <h1 class="token"><%= token %></h1>
           </div>
         </div>
       </div>
-
-      <script>
-
-        $("form").submit(function(e){
-          e.preventDefault();
-          $('.error').hide();
-          $('.success').hide();
-          $('.main-section').addClass('loading');
-          $('.loader').show();
-
-          axios.post('/prereg', {
-            username: $('#username').val(),
-            email: $('#email').val()
-          })
-          .then(function (response) {
-            $('.error').hide();
-            $('.success').text(response.data.success).show();
-          })
-          .catch(function (error) {
-            $('.success').hide();
-            $('.error').text(error.response.data.error || "undefined_error").show();
-          })
-          .finally(function() {
-            $('.loader').hide();
-            $('.main-section').removeClass('loading');
-          });
-
-        });
-
-      </script>
 
   </body>
 </html>

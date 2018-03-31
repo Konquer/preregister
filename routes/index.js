@@ -9,7 +9,9 @@ const config = require('../config');
 const mailgun = require('mailgun-js')({apiKey: config.mailgun.api_key, domain: config.mailgun.domain});
 
 router.get('/', (req, res, next) => {
-  res.render('index', { title: 'Express' });
+
+  res.render('index', { title: 'Preregister' });
+
 });
 
 router.post('/prereg', (req, res) => {
@@ -38,8 +40,13 @@ router.post('/prereg', (req, res) => {
 
   // Loop through all our preregistrations
   for(let i = 0; i < entries.length; i++) {
-    
+
     let entry = entries[i];
+
+    // Check if this IP address have already preregistered
+    if(config.ip_restricted) {
+      return res.status(400).json({"error": config.outputs.errors.ip_used});
+    }
 
     // Only check against verified preregistrations
     if(entry.verified) {
@@ -56,25 +63,26 @@ router.post('/prereg', (req, res) => {
 
     } else {
 
-      // If this email has already tried preregistering this username
+      // If this email have already tried preregistering this username
       if(entry.username.toLowerCase() == req.body.username.toLowerCase() && entry.email.toLowerCase() == req.body.email.toLowerCase()) {
         return res.status(400).json({"error": config.outputs.errors.already_asked_for_username});
       }
 
-    } 
+    }
 
   }
 
   // Generate a verification link
   let rndstr = cryptoRandomString(100);
-  
+
   db.get('preregistrations')
   .push({
     username: req.body.username,
     email: req.body.email,
     link: rndstr,
     token: shortid.generate(),
-    verified: false
+    verified: false,
+    ip: req.connection.remoteAddress
   })
   .write();
 
@@ -91,10 +99,10 @@ router.post('/prereg', (req, res) => {
     if(error) {
       res.status(400).json({"error": config.outputs.errors.mailgun_error});
     } else {
-      res.status(200).json({"success": config.outputs.success.preregistered.replace("#{email", req.body.email)});
+      res.status(200).json({"success": config.outputs.success.preregistered.replace("#{email}", req.body.email)});
     }
   });
-  
+
 });
 
 router.get('/activate/:link', (req, res, next) => {
@@ -116,7 +124,7 @@ router.get('/activate/:link', (req, res, next) => {
     // If the link exists
     if(entry.link == req.params.link) {
       found = true;
-      
+
       if(entry.verified) {
         return res.status(400).json({"error": config.outputs.errors.already_verified});
       }
@@ -137,8 +145,14 @@ router.get('/activate/:link', (req, res, next) => {
         if(error) {
           res.status(400).json({"error": config.outputs.errors.mailgun_error});
         } else {
-          res.status(200).json({"success": config.outputs.success.verified.replace("#{username}", entry.username)});
+          // replace the render below with this if we want to use it as an api
+          // res.status(200).json({"success": config.outputs.success.verified.replace("#{username}", entry.username)});
         }
+      });
+
+      return res.render('activated', {
+        username: entry.username,
+        token: entry.token
       });
 
     }
